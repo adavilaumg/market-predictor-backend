@@ -25,19 +25,19 @@ import jwt
 import bcrypt
 import os
 
-from app.database import (
+from database import (
     get_db,
     weather_collection,
     market_collection,
     correlation_collection,
     db
 )
-from app.schema import (
+from schema import (
     WeatherResponse, MarketResponse, CorrelationResponse,
     FetchWeatherRequest, FetchMarketRequest, AnalysisRequest, AnalysisResponse,
     SymbolStats,
 )
-from app.services import (
+from services import (
     fetch_current_weather, fetch_weather_forecast,
     fetch_eod_prices, fetch_intraday_prices, search_tickers,
 )
