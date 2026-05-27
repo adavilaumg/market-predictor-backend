@@ -32,12 +32,12 @@ from database import (
     correlation_collection,
     db
 )
-from schema import (
+from app.schema import (
     WeatherResponse, MarketResponse, CorrelationResponse,
     FetchWeatherRequest, FetchMarketRequest, AnalysisRequest, AnalysisResponse,
     SymbolStats,
 )
-from services import (
+from app.services import (
     fetch_current_weather, fetch_weather_forecast,
     fetch_eod_prices, fetch_intraday_prices, search_tickers,
 )
