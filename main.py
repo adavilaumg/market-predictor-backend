@@ -14,7 +14,6 @@ Endpoints:
   POST /analysis                  → Análisis clima vs precios
 """
 
-from app.database import get_db, weather_collection, market_collection, correlation_collection, db
 from fastapi import FastAPI, HTTPException, Query, Depends
 from fastapi.middleware.cors import CORSMiddleware
 from pymongo.database import Database
@@ -31,6 +30,7 @@ from app.database import (
     weather_collection,
     market_collection,
     correlation_collection,
+    db
 )
 from app.schema import (
     WeatherResponse, MarketResponse, CorrelationResponse,
