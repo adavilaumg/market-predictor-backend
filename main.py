@@ -24,6 +24,8 @@ from datetime import datetime, timedelta
 import jwt
 import bcrypt
 import os
+import json
+from google.oauth2 import service_account
 
 from database import (
     get_db,
@@ -49,10 +51,19 @@ from google.analytics.data_v1beta.types import (
     RunReportRequest,
 )
 
-os.environ["GOOGLE_APPLICATION_CREDENTIALS"] = "marketpredictionumg-1efa6b8ca169.json"
-PROPERTY_ID = "539467954" 
+PROPERTY_ID = os.getenv("GA_PROPERTY_ID", "539467954")
 
-client = BetaAnalyticsDataClient()
+def get_analytics_client():
+    json_str = os.getenv("GA_SERVICE_ACCOUNT_JSON")
+    if json_str:
+        info = json.loads(json_str)
+        credentials = service_account.Credentials.from_service_account_info(
+            info,
+            scopes=["https://www.googleapis.com/auth/analytics.readonly"],
+        )
+        return BetaAnalyticsDataClient(credentials=credentials)
+    return BetaAnalyticsDataClient()
+
 # ─── Helpers ─────────────────────────────────────────────────
 
 def serialize(doc: dict) -> dict:
@@ -429,7 +440,7 @@ def get_analytics_summary():
             date_ranges=[DateRange(start_date="30daysAgo", end_date="today")],
         )
         
-        response = client.run_report(request)
+        response = get_analytics_client().run_report(request)
         
         metrics_data = []
         total_events = 0
@@ -474,7 +485,7 @@ def get_mobile_screens_metrics():
             metrics=[Metric(name="screenPageViews")],
             date_ranges=[DateRange(start_date="30daysAgo", end_date="today")],
         )
-        response = client.run_report(request)
+        response = get_analytics_client().run_report(request)
         
         screens_data = []
         for row in response.rows:
