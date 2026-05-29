@@ -49,7 +49,7 @@ from google.analytics.data_v1beta.types import (
     RunReportRequest,
 )
 
-os.environ["GOOGLE_APPLICATION_CREDENTIALS"] = "market-prediction-umg-9535ca980d9a.json"
+os.environ["GOOGLE_APPLICATION_CREDENTIALS"] = "marketpredictionumg-1efa6b8ca169.json"
 PROPERTY_ID = "539467954" 
 
 client = BetaAnalyticsDataClient()
