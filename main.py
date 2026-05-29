@@ -13,7 +13,7 @@ Endpoints:
   GET  /data/correlations         → Lista correlaciones guardadas
   POST /analysis                  → Análisis clima vs precios
 """
-
+from predict import train_and_predict
 from fastapi import FastAPI, HTTPException, Query, Depends
 from fastapi.middleware.cors import CORSMiddleware
 from pymongo.database import Database
@@ -41,7 +41,18 @@ from services import (
     fetch_current_weather, fetch_weather_forecast,
     fetch_eod_prices, fetch_intraday_prices, search_tickers,
 )
+from google.analytics.data_v1beta import BetaAnalyticsDataClient
+from google.analytics.data_v1beta.types import (
+    DateRange,
+    Dimension,
+    Metric,
+    RunReportRequest,
+)
 
+os.environ["GOOGLE_APPLICATION_CREDENTIALS"] = "market-prediction-umg-9535ca980d9a.json"
+PROPERTY_ID = "539467954" 
+
+client = BetaAnalyticsDataClient()
 # ─── Helpers ─────────────────────────────────────────────────
 
 def serialize(doc: dict) -> dict:
@@ -353,3 +364,126 @@ async def login(req: LoginRequest):
         raise HTTPException(status_code=401, detail="Credenciales incorrectas")
     
     return AuthResponse(access_token=create_token(req.username))
+
+@app.post("/predict", tags=["Prediction"])
+async def predict_price_movement(
+    symbol: str = Query(..., example="AAPL"),
+    city:   str = Query(..., example="Guatemala City"),
+):
+    """
+    Modelo de clasificación: predice si el precio de un símbolo
+    subirá o bajará basándose en la temperatura actual de la ciudad.
+ 
+    Flujo:
+      1. Obtiene 50 días de precios EOD de MarketStack
+      2. Obtiene temperatura actual de OpenWeatherMap
+      3. Entrena un RandomForestClassifier en tiempo real
+      4. Predice con la temperatura actual como feature principal
+    """
+    try:
+        result = await train_and_predict(symbol, city)
+ 
+        # Guardar predicción en MongoDB
+        result_to_save = {**result, "created_at": datetime.utcnow()}
+        db["predictions"].insert_one(result_to_save)
+ 
+        return result
+    except ValueError as e:
+        raise HTTPException(status_code=400, detail=str(e))
+    except Exception as e:
+        raise HTTPException(status_code=502, detail=str(e))
+ 
+ 
+@app.get("/predict/history", tags=["Prediction"])
+def get_prediction_history(
+    symbol: str  = Query(None, example="AAPL"),
+    limit:  int  = Query(20, ge=1, le=100),
+):
+    """Retorna el historial de predicciones guardadas en MongoDB."""
+    query = {}
+    if symbol:
+        query["symbol"] = symbol.upper()
+ 
+    docs = list(
+        db["predictions"]
+        .find(query, {"_id": 0})
+        .sort("created_at", -1)
+        .limit(limit)
+    )
+    return {"count": len(docs), "predictions": docs}
+
+@app.get("/analytics/summary", tags=["Analytics"])
+def get_analytics_summary():
+    """
+    Retorna métricas generales de uso de la app móvil (usuarios activos y conteo de eventos)
+    en los últimos 30 días recopilados por Firebase Analytics.
+    """
+    try:
+        request = RunReportRequest(
+            property=f"properties/{PROPERTY_ID}",
+            dimensions=[Dimension(name="eventName")],
+            metrics=[
+                Metric(name="activeUsers"),
+                Metric(name="eventCount")
+            ],
+            date_ranges=[DateRange(start_date="30daysAgo", end_date="today")],
+        )
+        
+        response = client.run_report(request)
+        
+        metrics_data = []
+        total_events = 0
+        total_users = 0
+        
+        for row in response.rows:
+            e_name = row.dimension_values[0].value
+            u_count = int(row.metric_values[0].value)
+            e_count = int(row.metric_values[1].value)
+            
+            total_events += e_count
+            total_users += u_count
+            
+            metrics_data.append({
+                "event_name": e_name,
+                "users": u_count,
+                "count": e_count
+            })
+            
+        return {
+            "status": "success",
+            "summary": {
+                "total_events_tracked": total_events,
+                "estimated_active_users": total_users
+            },
+            "detailed_events": metrics_data
+        }
+
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=f"Error con GA4 API: {str(e)}")
+
+
+@app.get("/analytics/screens", tags=["Analytics"])
+def get_mobile_screens_metrics():
+    """
+    Retorna cuáles son las pantallas de la app en Kotlin (vistas) más visitadas por los usuarios.
+    """
+    try:
+        request = RunReportRequest(
+            property=f"properties/{PROPERTY_ID}",
+            dimensions=[Dimension(name="screenName")],
+            metrics=[Metric(name="screenPageViews")],
+            date_ranges=[DateRange(start_date="30daysAgo", end_date="today")],
+        )
+        response = client.run_report(request)
+        
+        screens_data = []
+        for row in response.rows:
+            screens_data.append({
+                "screen_name": row.dimension_values[0].value,
+                "views": int(row.metric_values[0].value)
+            })
+            
+        return {"status": "success", "screens": screens_data}
+        
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=f"Error con GA4 API: {str(e)}")
