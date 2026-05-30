@@ -498,3 +498,29 @@ def get_mobile_screens_metrics():
         
     except Exception as e:
         raise HTTPException(status_code=500, detail=f"Error con GA4 API: {str(e)}")
+    
+
+@app.get("/analytics/mock", tags=["Analytics"])
+def get_mock_analytics():
+    """Datos ficticios de analytics para demo cuando Firebase no tiene datos aún."""
+    return {
+        "status": "success",
+        "summary": {
+            "total_events_tracked": 247,
+            "estimated_active_users": 38
+        },
+        "detailed_events": [
+            {"event_name": "tab_view",       "users": 18, "count": 89},
+            {"event_name": "weather_fetch",  "users": 15, "count": 52},
+            {"event_name": "analysis_run",   "users": 12, "count": 41},
+            {"event_name": "market_fetch",   "users": 14, "count": 38},
+            {"event_name": "login",          "users": 20, "count": 20},
+            {"event_name": "logout",         "users": 7,  "count": 7},
+        ],
+        "screens": [
+            {"screen_name": "Clima",        "views": 89},
+            {"screen_name": "Mercado",      "views": 67},
+            {"screen_name": "Análisis",     "views": 54},
+            {"screen_name": "Correlaciones","views": 37},
+        ]
+    }
